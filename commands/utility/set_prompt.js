@@ -25,10 +25,14 @@ module.exports = {
         fs.writeFile('../../settings.json', content, async err => {
             if (err) {
                 console.error(err);
-                await interaction.reply("Error! Nothing has changed! " + err);
+                try{
+                    await interaction.reply("Error! Nothing has changed! " + err);
+                }catch{}
             } else {
                 // file written successfully
-                await interaction.reply('Successfully set the system instructions to: ```'+ newInstructions +'```');
+                try{
+                    await interaction.reply('Successfully set the system instructions to: ```'+ newInstructions +'```');
+                }catch{}
             }
         });
 

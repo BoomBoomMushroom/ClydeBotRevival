@@ -7,6 +7,24 @@ const { token, clientId, geminiToken, defaultSystemInstructions, TextMemoryLengt
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 let settings = require("./settings.json");
 
+const safetySettings = [
+    {
+        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+        category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold: HarmBlockThreshold.BLOCK_NONE,
+    }
+];
 const geminiAI = new GoogleGenerativeAI(geminiToken);
 
 // Create a new client instance
@@ -43,12 +61,13 @@ async function writeSettings(settings){
     });
 }
 
-async function getGeminiResponse(message) {
+async function getGeminiResponse(message, imageAttachments) {
     let systemInstruction = defaultSystemInstructions + "\n" + settings["SystemInstructionAddon"]
 
     const model = geminiAI.getGenerativeModel({
         model: "gemini-1.5-flash",
         systemInstruction: systemInstruction,
+        safetySettings: safetySettings,
     });
     
     const generationConfig = {
@@ -58,21 +77,25 @@ async function getGeminiResponse(message) {
         maxOutputTokens: 8192,
         responseMimeType: "text/plain",
     };
-    
+
     const chatSession = model.startChat({
         generationConfig,
         history: settings["ChatHistory"],
     });
-    
-    const result = await chatSession.sendMessage(message);
-    const responseText = result.response.text()
+
+    imageAttachments.push(message)
+    console.log(imageAttachments)
+    const result = await chatSession.sendMessage(imageAttachments);
+    let responseText = result.response.text()
+
+    responseText = responseText.slice(0, 1800) // max chars (from discord)
 
     settings["ChatHistory"].push({"role": "user", "parts": [{"text": message}]})
     settings["ChatHistory"].push({"role": "model", "parts": [{"text": responseText}]})
     let cutDownHistory = settings["ChatHistory"].slice( -(TextMemoryLength*2) )
     settings["ChatHistory"] = cutDownHistory
     writeSettings(settings)
-    
+
     return responseText
 }
 
@@ -113,18 +136,48 @@ client.on(Events.MessageCreate, async message => {
             iAmMentioned = true
             // messageContent.replace("<@" + clientId + ">", "")
         }
-        else{
-            messageContent = messageContent.replace("<@" + user.id + ">", "@" + user.username)
-            console.log(user)
-        }
+        let userAt = "<@" + user.id + ">"
+        messageContent = messageContent.replace(userAt, `@${user.username} / @${user.globalName} (${userAt})`)
+        //console.log(user)
     })
     if(iAmMentioned == false){
         return;
     }
-    
 
+    console.log(message)
+
+    let attachments = []
+    let messageAttachments = message.attachments.toJSON()
+    for(let i=0; i<messageAttachments.length; i++){
+        let attachment = messageAttachments[i]
+        if(attachment.contentType.startsWith("image") == false){ continue }
+        
+        let imgData = await fetch(attachment.url)
+        .then((response)=>response.arrayBuffer());
+        
+        attachments.push({
+            inlineData: {
+                data: Buffer.from(imgData).toString("base64"),
+                mimeType: attachment.contentType,
+            }
+        })
+    }
+    
     let messageToSendAI = message.author.username + ": " + messageContent
-    let response = await getGeminiResponse(messageToSendAI)
+
+    let hasRef = message.reference != null
+    if(hasRef){
+        let referenceMessage = await message.fetchReference()
+        let refContent = referenceMessage.content
+        let refUsername = referenceMessage.author.username
+        let usernameInput = `@${referenceMessage.author.username} / @${referenceMessage.author.globalName} (${referenceMessage.author.id})`
+
+        messageToSendAI = `Message being replied to: \`\`\`${usernameInput}: ${refContent}\`\`\`\n` + messageToSendAI
+
+        //console.log(referenceMessage)
+    }
+
+    let response = await getGeminiResponse(messageToSendAI, attachments)
     
     console.log("Message Content: " + messageToSendAI)
     console.log("Message Response: " + response)
