@@ -91,7 +91,12 @@ async function getGeminiResponse(guildId, message, imageAttachments) {
     imageAttachments.push(message)
     console.log(imageAttachments)
     const result = await chatSession.sendMessage(imageAttachments);
-    let responseText = result.response.text()
+    let responseText = ""
+    try{
+        responseText = result.response.text()
+    } catch{
+        responseText = "Google Gemini has blocked this response >:C"
+    }
 
     responseText = responseText.slice(0, 1800) // max chars (from discord)
 
