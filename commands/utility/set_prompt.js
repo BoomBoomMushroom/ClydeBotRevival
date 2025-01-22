@@ -13,6 +13,7 @@ module.exports = {
 	async execute(interaction) {
         let newInstructions = interaction.options.getString('instructions') ?? null;
         console.log("instructs: " + newInstructions)
+        console.log(interaction)
         if(newInstructions == null){
             await interaction.reply('No prompt supplied! Nothing has changed!');
             return;
@@ -20,8 +21,15 @@ module.exports = {
         console.log("Do something with the prompt");
 
         let settings = require("../../settings.json");
-        settings["SystemInstructionAddon"] = newInstructions
-        let content = JSON.stringify(settings)
+        let guildId = interaction.guildId
+
+        if(guildId in settings){}
+        else{
+            settings[guildId] = {"SystemInstructionAddon": "", "ChatHistory": []}
+        }
+
+        settings[guildId]["SystemInstructionAddon"] = newInstructions
+        let content = JSON.stringify(settings, null, 4)
         fs.writeFile('../../settings.json', content, async err => {
             if (err) {
                 console.error(err);

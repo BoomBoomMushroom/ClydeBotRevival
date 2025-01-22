@@ -51,7 +51,7 @@ for (const folder of commandFolders) {
 }
 
 async function writeSettings(settings){
-    let content = JSON.stringify(settings)
+    let content = JSON.stringify(settings, null, 4)
     fs.writeFile('./settings.json', content, err => {
         if (err) {
             console.error(err);
@@ -61,8 +61,13 @@ async function writeSettings(settings){
     });
 }
 
-async function getGeminiResponse(message, imageAttachments) {
-    let systemInstruction = defaultSystemInstructions + "\n" + settings["SystemInstructionAddon"]
+async function getGeminiResponse(guildId, message, imageAttachments) {
+    if(guildId in settings){}
+    else{
+        settings[guildId] = {"SystemInstructionAddon": "", "ChatHistory": []}
+    }
+    
+    let systemInstruction = defaultSystemInstructions + "\n" + settings[guildId]["SystemInstructionAddon"]
 
     const model = geminiAI.getGenerativeModel({
         model: "gemini-1.5-flash",
@@ -80,7 +85,7 @@ async function getGeminiResponse(message, imageAttachments) {
 
     const chatSession = model.startChat({
         generationConfig,
-        history: settings["ChatHistory"],
+        history: settings[guildId]["ChatHistory"],
     });
 
     imageAttachments.push(message)
@@ -90,10 +95,10 @@ async function getGeminiResponse(message, imageAttachments) {
 
     responseText = responseText.slice(0, 1800) // max chars (from discord)
 
-    settings["ChatHistory"].push({"role": "user", "parts": [{"text": message}]})
-    settings["ChatHistory"].push({"role": "model", "parts": [{"text": responseText}]})
-    let cutDownHistory = settings["ChatHistory"].slice( -(TextMemoryLength*2) )
-    settings["ChatHistory"] = cutDownHistory
+    settings[guildId]["ChatHistory"].push({"role": "user", "parts": [{"text": message}]})
+    settings[guildId]["ChatHistory"].push({"role": "model", "parts": [{"text": responseText}]})
+    let cutDownHistory = settings[guildId]["ChatHistory"].slice( -(TextMemoryLength*2) )
+    settings[guildId]["ChatHistory"] = cutDownHistory
     writeSettings(settings)
 
     return responseText
@@ -163,7 +168,8 @@ client.on(Events.MessageCreate, async message => {
         })
     }
     
-    let messageToSendAI = message.author.username + ": " + messageContent
+    let messageUserPrefix = `${message.author.globalName} / ${message.author.displayName} / ${message.author.username}`
+    let messageToSendAI = messageUserPrefix + ": " + messageContent
 
     let hasRef = message.reference != null
     if(hasRef){
@@ -177,7 +183,8 @@ client.on(Events.MessageCreate, async message => {
         //console.log(referenceMessage)
     }
 
-    let response = await getGeminiResponse(messageToSendAI, attachments)
+    let guildId = message.guildId
+    let response = await getGeminiResponse(guildId, messageToSendAI, attachments)
     
     console.log("Message Content: " + messageToSendAI)
     console.log("Message Response: " + response)

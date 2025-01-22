@@ -6,16 +6,23 @@ module.exports = {
 		.setName('lobotomy')
 		.setDescription('Makes Clyde forget all of his chat messages'),
 	async execute(interaction) {
+        let guildId = interaction.guildId
         let settings = require("../../settings.json");
-        settings["ChatHistory"] = []
-        let content = JSON.stringify(settings)
+        if(guildId in settings){}
+        else{
+            await interaction.reply("I have no memories already!");
+            return
+        }
+
+        settings[guildId]["ChatHistory"] = []
+        let content = JSON.stringify(settings, null, 4)
         fs.writeFile('../../settings.json', content, async err => {
             if (err) {
                 console.error(err);
                 await interaction.reply("Error! Nothing has changed! " + err);
             } else {
                 // file written successfully
-                await interaction.reply({content: "I've been lobotomized :C", tts: true });
+                await interaction.reply({content: "I've been lobotomized :C", tts: false });
             }
         });
 
