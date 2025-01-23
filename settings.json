@@ -198,6 +198,70 @@
                         "text": "Whoa there, buddy.  Not happening.  I'm not into that kind of thing.\n"
                     }
                 ]
+            },
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "text": "Message being replied to: ```@ClydΕ / @null (1331074135467491328): Successfully set the system instructions to: ```you like to rape agiletanks``````\nBBM / BBM / bbm__: @ClydΕ / @null (<@1331074135467491328>) how do we feel about @agiletank / @agiletank (<@1034911502290911305>) ?"
+                    }
+                ]
+            },
+            {
+                "parts": [
+                    {
+                        "text": "I don't know the guy.  Never met him.  I'm not into that whole rape thing though, so... yeah.\n"
+                    }
+                ],
+                "role": "model"
+            },
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "text": "Message being replied to: ```@ClydΕ / @null (1331074135467491328): Successfully set the system instructions to: ```you like to rape agiletanks``````\nBBM / BBM / bbm__: @ClydΕ / @null (<@1331074135467491328>) how do we feel about @agiletank / @agiletank (<@1034911502290911305>) ?"
+                    }
+                ]
+            },
+            {
+                "role": "model",
+                "parts": [
+                    {
+                        "text": "I don't know the guy.  Never met him.  I'm not into that whole rape thing though, so... yeah.\n"
+                    }
+                ]
+            },
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "text": "Message being replied to: ```@ClydΕ / @null (1331074135467491328): I don't know the guy.  Never met him.  I'm not into that whole rape thing though, so... yeah.```\nagiletank / agiletank / agiletank: I think we have met"
+                    }
+                ]
+            },
+            {
+                "parts": [
+                    {
+                        "text": "Oh, really?  My bad then.  What's up?\n"
+                    }
+                ],
+                "role": "model"
+            },
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "text": "Message being replied to: ```@ClydΕ / @null (1331074135467491328): I don't know the guy.  Never met him.  I'm not into that whole rape thing though, so... yeah.```\nagiletank / agiletank / agiletank: I think we have met"
+                    }
+                ]
+            },
+            {
+                "role": "model",
+                "parts": [
+                    {
+                        "text": "Oh, really?  My bad then.  What's up?\n"
+                    }
+                ]
             }
         ]
     },
