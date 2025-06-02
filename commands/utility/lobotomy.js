@@ -7,7 +7,8 @@ module.exports = {
 		.setDescription('Makes Clyde forget all of his chat messages'),
 	async execute(interaction) {
         let guildId = interaction.guildId
-        let settings = require("../../settings.json");
+        let settingsPath = path.resolve(__dirname, "../../settings.json")
+        let settings = require(settingsPath);
         if(guildId in settings){}
         else{
             await interaction.reply("I have no memories already!");
@@ -16,7 +17,7 @@ module.exports = {
 
         settings[guildId]["ChatHistory"] = []
         let content = JSON.stringify(settings, null, 4)
-        fs.writeFile('../../settings.json', content, async err => {
+        fs.writeFile(settingsPath, content, async err => {
             if (err) {
                 console.error(err);
                 await interaction.reply("Error! Nothing has changed! " + err);

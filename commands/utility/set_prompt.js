@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const fs = require('node:fs');
+const path = require("path")
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -20,7 +21,8 @@ module.exports = {
         }
         console.log("Do something with the prompt");
 
-        let settings = require("../../settings.json");
+        let settingsPath = path.resolve(__dirname, "../../settings.json")
+        let settings = require(settingsPath);
         let guildId = interaction.guildId
 
         if(guildId in settings){}
@@ -30,7 +32,7 @@ module.exports = {
 
         settings[guildId]["SystemInstructionAddon"] = newInstructions
         let content = JSON.stringify(settings, null, 4)
-        fs.writeFile('../../settings.json', content, async err => {
+        fs.writeFile(settingsPath, content, async err => {
             if (err) {
                 console.error(err);
                 try{

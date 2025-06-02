@@ -6,7 +6,8 @@ module.exports = {
 		.setDescription('Gets the internal prompt of Clyde'),
 	async execute(interaction) {
 		let guildId = interaction.guildId
-		let settings = require("../../settings.json")
+        let settingsPath = path.resolve(__dirname, "../../settings.json")
+		let settings = require(settingsPath)
 		if(guildId in settings){
 			let systemInstructions = settings[guildId]["SystemInstructionAddon"];
 			await interaction.reply("Here are the system instructions: ```" + systemInstructions + "```")
