@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
-const { token, clientId, geminiToken, defaultSystemInstructions, TextMemoryLength } = require('./config.json');
+const { token, clientId, geminiToken, geminiModel, defaultSystemInstructions, TextMemoryLength } = require('./config.json');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 let settings = require("./settings.json");
 
@@ -70,7 +70,7 @@ async function getGeminiResponse(guildId, message, imageAttachments) {
     let systemInstruction = defaultSystemInstructions + "\n" + settings[guildId]["SystemInstructionAddon"]
 
     const model = geminiAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: geminiModel,
         systemInstruction: systemInstruction,
         safetySettings: safetySettings,
     });
@@ -181,7 +181,7 @@ client.on(Events.MessageCreate, async message => {
         let referenceMessage = await message.fetchReference()
         let refContent = referenceMessage.content
         let refUsername = referenceMessage.author.username
-        let usernameInput = `@${referenceMessage.author.username} / @${referenceMessage.author.globalName} (${referenceMessage.author.id})`
+        let usernameInput = `@${refUsername} / @${referenceMessage.author.globalName} (${referenceMessage.author.id})`
 
         messageToSendAI = `Message being replied to: \`\`\`${usernameInput}: ${refContent}\`\`\`\n` + messageToSendAI
 
