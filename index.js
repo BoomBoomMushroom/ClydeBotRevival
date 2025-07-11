@@ -4,9 +4,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
 const { token, clientId, geminiToken, geminiModel, defaultSystemInstructions, TextMemoryLength } = require('./config.json');
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
+const { GoogleGenAI, HarmCategory, HarmBlockThreshold } = require("@google/genai");
 let settings = require("./settings.json");
 
+const geminiTools = [
+    { urlContext: {} },
+    { googleSearch: {} },
+];
 const safetySettings = [
     {
         category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -25,7 +29,7 @@ const safetySettings = [
         threshold: HarmBlockThreshold.BLOCK_NONE,
     }
 ];
-const geminiAI = new GoogleGenerativeAI(geminiToken);
+const geminiAI = new GoogleGenAI({apiKey: geminiToken});
 
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages] });
@@ -68,32 +72,39 @@ async function getGeminiResponse(guildId, message, imageAttachments) {
     }
     
     let systemInstruction = defaultSystemInstructions + "\n" + settings[guildId]["SystemInstructionAddon"]
-
-    const model = geminiAI.getGenerativeModel({
-        model: geminiModel,
-        systemInstruction: systemInstruction,
-        safetySettings: safetySettings,
-    });
-    
     const generationConfig = {
         temperature: 1,
         topP: 0.95,
         topK: 40,
         maxOutputTokens: 8192,
         responseMimeType: "text/plain",
+        safetySettings: safetySettings,
+        systemInstruction: [
+            {"text": systemInstruction}
+        ],
+        tools: geminiTools,
     };
 
-    const chatSession = model.startChat({
-        generationConfig,
-        history: settings[guildId]["ChatHistory"],
-    });
+    var contents = settings[guildId]["ChatHistory"]
+    var messageParts = []
+    messageParts.push(...imageAttachments)
+    messageParts.push({"text": message})
+    contents.push({"role": "user", "parts": messageParts})
+    //console.log(imageAttachments)
 
-    imageAttachments.push(message)
-    console.log(imageAttachments)
-    const result = await chatSession.sendMessage(imageAttachments);
+    let response = await geminiAI.models.generateContentStream({
+        model: geminiModel,
+        config: generationConfig,
+        contents: contents,
+    })
+    
     let responseText = ""
     try{
-        responseText = result.response.text()
+        for await (const chunk of response) {
+            let part = chunk.text
+            //console.log(part);
+            responseText += part
+        }
     } catch{
         responseText = "Google Gemini has blocked this response >:C"
     }
