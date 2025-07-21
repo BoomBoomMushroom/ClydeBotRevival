@@ -3,7 +3,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
-const { token, clientId, geminiToken, geminiModel, defaultSystemInstructions, TextMemoryLength } = require('./config.json');
+const { token, clientId, geminiToken, geminiModel, defaultSystemInstructions, TextMemoryLength,
+    ADMIN_USERIDs, THEO_USERID
+ } = require('./config.json');
 const { GoogleGenAI, HarmCategory, HarmBlockThreshold } = require("@google/genai");
 let settings = require("./settings.json");
 
@@ -150,6 +152,13 @@ client.on(Events.MessageCreate, async message => {
     let userMentions = message.mentions.users
     let messageContent = message.content
     let iAmMentioned = false
+    
+    if(message.author.id == THEO_USERID && settings[message.guildId]["IgnoreTheo"]==true){
+        try{
+            message.reply({"content": "I will not reply to you Theo"});
+        }catch{}
+        return
+    }
 
     userMentions.forEach((user)=>{
         if (user.id == clientId){
@@ -205,7 +214,9 @@ client.on(Events.MessageCreate, async message => {
     console.log("Message Content: " + messageToSendAI)
     console.log("Message Response: " + response)
 
-    message.reply({"content": response})
+    try{
+        message.reply({"content": response})
+    } catch {}
 });
 
 // Log in to Discord with your client's token
