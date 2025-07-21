@@ -152,13 +152,6 @@ client.on(Events.MessageCreate, async message => {
     let userMentions = message.mentions.users
     let messageContent = message.content
     let iAmMentioned = false
-    
-    if(message.author.id == THEO_USERID && settings[message.guildId]["IgnoreTheo"]==true){
-        try{
-            message.reply({"content": "I will not reply to you Theo"});
-        }catch{}
-        return
-    }
 
     userMentions.forEach((user)=>{
         if (user.id == clientId){
@@ -172,6 +165,13 @@ client.on(Events.MessageCreate, async message => {
     })
     if(iAmMentioned == false){
         return;
+    }
+
+    if(message.author.id == THEO_USERID && settings[message.guildId]["IgnoreTheo"]==true){
+        try{
+            message.reply({"content": "I will not reply to you Theo"});
+        }catch{}
+        return
     }
 
     console.log(message)
