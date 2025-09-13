@@ -11,7 +11,6 @@ let settings = require("./settings.json");
 
 const geminiTools = [
     { urlContext: {} },
-    { googleSearch: {} },
 ];
 const safetySettings = [
     {
@@ -85,6 +84,7 @@ async function getGeminiResponse(guildId, message, imageAttachments) {
             {"text": systemInstruction}
         ],
         tools: geminiTools,
+        //thinkingConfig: { thinkingBudget: 0 },
     };
 
     var contents = settings[guildId]["ChatHistory"]
