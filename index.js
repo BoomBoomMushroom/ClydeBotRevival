@@ -232,6 +232,7 @@ async function getGeminiResponse(guildId, message, imageAttachments) {
 }
 
 async function changeNickname(newUsername, userId, guildId) {
+    if(userId != clientId){ return "You can only change your name! Not <@" + userId + ">'s name!" }
     console.log("Changing username of " + userId + " to " + newUsername + " in guildId " +guildId);
     try{
         let guild = await client.guilds.cache.get(guildId);
