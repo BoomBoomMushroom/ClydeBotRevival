@@ -7,11 +7,31 @@ const { token, clientId, geminiToken, geminiModel, defaultSystemInstructions, Te
     ADMIN_USERIDs, THEO_USERID
  } = require('./config.json');
 const { GoogleGenAI, HarmCategory, HarmBlockThreshold } = require("@google/genai");
+const { Type } = require("@google/genai");
+
 let settings = require("./settings.json");
 
 const geminiTools = [
     { urlContext: {} },
 ];
+const geminiToolsFunctionsOnly = [
+    {
+        functionDeclarations: [
+            {
+                name: 'ChangeNickname',
+                description: 'Changes the username of the person given',
+                parameters: {
+                type: Type.OBJECT,
+                required: ["NewUsername", "UserID"],
+                properties: {
+                        NewUsername: { type: Type.STRING, },
+                        UserID: { type: Type.STRING, },
+                    },
+                },
+            },
+        ],
+    }
+]
 const safetySettings = [
     {
         category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -33,7 +53,15 @@ const safetySettings = [
 const geminiAI = new GoogleGenAI({apiKey: geminiToken});
 
 // Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages] });
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.GuildMembers,
+    ]
+});
 
 client.commands = new Collection();
 
@@ -66,11 +94,109 @@ async function writeSettings(settings){
     });
 }
 
+async function generateGeminiResponseWithContent(contents, generationConfig, guildId){
+    let response = await geminiAI.models.generateContentStream({
+        model: geminiModel,
+        config: generationConfig,
+        contents: contents,
+    })
+    
+    let responseText = ""
+    try{
+        for await (const chunk of response) {
+            console.log(chunk.functionCalls ? chunk.functionCalls[0] : chunk.text)
+            if(chunk.functionCalls){
+                let functionCall = chunk.functionCalls[0]
+                if(functionCall.name == "ChangeNickname"){
+                    let newUsername = functionCall.args.NewUsername
+                    let userIdToChange = functionCall.args.UserID
+                    let returnVal = await changeNickname(newUsername, userIdToChange, guildId)
+                    if(returnVal != true){ // an error occurred lets put that in clyde's response
+                        responseText += "\nChangeNickname('"+newUsername+"', '"+userIdToChange+"', "+guildId+")\n\t-> "+returnVal+"\n"
+                    }
+                    else{ returnVal = "Successfully changed nickname! You can stop calling this function now" }
+                    
+                    console.log(returnVal);
+                    let functionResponsePart = {
+                        name: functionCall.name,
+                        response: { returnVal }
+                    }
+                    contents.push({"role": "user", "parts": [{functionResponse: functionResponsePart}]})
+                    
+                    generationConfig["tools"] = geminiTools
+                    responseText += await generateGeminiResponseWithContent(contents, generationConfig, guildId);
+                }
+            }
+            else{
+                let part = chunk.text
+                responseText += part
+            }
+        }
+    } catch(e){
+        console.error(e)
+        responseText = "I think Google Gemini has blocked this response D:\nHere is the error ```"+e+"```"
+        //responseText = "Google Gemini has blocked this response >:C"
+    }
+
+    return responseText;
+}
+
+async function determineIfNeedUseTools(guildId, message){
+    if(guildId in settings){}
+    else{
+        settings[guildId] = {"SystemInstructionAddon": "", "ChatHistory": []}
+    }
+    
+    let systemInstruction = defaultSystemInstructions + "\n" + settings[guildId]["SystemInstructionAddon"]
+    systemInstruction += "\n\nSearching the internet and url context are not function tools. only return true if you would call one of these functions, internet searhcing and url context doens't count"
+    const config = {
+        maxOutputTokens: 1024,
+        thinkingConfig: {
+            thinkingBudget: 0,
+        },
+        responseMimeType: 'application/json',
+        responseSchema: {
+            type: Type.OBJECT,
+            required: ["reasonableToCallTools"],
+            properties: {
+                reasonableToCallTools: {
+                type: Type.BOOLEAN,
+                },
+            },
+        },
+        systemInstruction: [{text: systemInstruction}]
+    };
+    message += "\n\nTools available:"
+    for(let i=0; i<geminiToolsFunctionsOnly[0].functionDeclarations.length; i++){
+        let functionTool = geminiToolsFunctionsOnly[0].functionDeclarations[i]
+        message += "\nName: " + functionTool.name + " | Desc: " + functionTool.description + "Required Vars: " + functionTool.required
+    }
+    
+    const contents = [
+        {
+            role: 'user',
+            parts: [ { text: message } ],
+        },
+    ];
+    const response = await geminiAI.models.generateContentStream({
+        model: geminiModel,
+        config: config,
+        contents: contents,
+    });
+    out = ""
+    for await (const chunk of response) {
+        out += chunk.text;
+    }
+    return JSON.parse(out).reasonableToCallTools
+}
+
 async function getGeminiResponse(guildId, message, imageAttachments) {
     if(guildId in settings){}
     else{
         settings[guildId] = {"SystemInstructionAddon": "", "ChatHistory": []}
     }
+
+    let shouldOnlyUseFunctionTools = await determineIfNeedUseTools(guildId, message)
     
     let systemInstruction = defaultSystemInstructions + "\n" + settings[guildId]["SystemInstructionAddon"]
     const generationConfig = {
@@ -83,8 +209,7 @@ async function getGeminiResponse(guildId, message, imageAttachments) {
         systemInstruction: [
             {"text": systemInstruction}
         ],
-        tools: geminiTools,
-        //thinkingConfig: { thinkingBudget: 0 },
+        tools: (shouldOnlyUseFunctionTools ? geminiToolsFunctionsOnly : geminiTools), // switches to the geminiTools again after a function tool is used in generateGeminiResponseWithContent
     };
 
     var contents = settings[guildId]["ChatHistory"]
@@ -94,23 +219,7 @@ async function getGeminiResponse(guildId, message, imageAttachments) {
     contents.push({"role": "user", "parts": messageParts})
     //console.log(imageAttachments)
 
-    let response = await geminiAI.models.generateContentStream({
-        model: geminiModel,
-        config: generationConfig,
-        contents: contents,
-    })
-    
-    let responseText = ""
-    try{
-        for await (const chunk of response) {
-            let part = chunk.text
-            //console.log(part);
-            responseText += part
-        }
-    } catch{
-        responseText = "Google Gemini has blocked this response >:C"
-    }
-
+    let responseText = await generateGeminiResponseWithContent(contents, generationConfig, guildId)
     responseText = responseText.slice(0, 1800) // max chars (from discord)
 
     settings[guildId]["ChatHistory"].push({"role": "user", "parts": [{"text": message}]})
@@ -120,6 +229,22 @@ async function getGeminiResponse(guildId, message, imageAttachments) {
     writeSettings(settings)
 
     return responseText
+}
+
+async function changeNickname(newUsername, userId, guildId) {
+    console.log("Changing username of " + userId + " to " + newUsername + " in guildId " +guildId);
+    try{
+        let guild = await client.guilds.cache.get(guildId);
+        console.log(guild)
+        let guildUser = await guild.members.fetch(userId.toString());
+        console.log(guildUser)
+        await guildUser.setNickname(newUsername, "Clyde called a command to change the username")
+        return true
+    }
+    catch(e){
+        console.error(e)
+        return "Error! " + e
+    }
 }
 
 client.once(Events.ClientReady, readyClient => {
@@ -193,15 +318,14 @@ client.on(Events.MessageCreate, async message => {
         })
     }
     
-    let messageUserPrefix = `${message.author.globalName} / ${message.author.displayName} / ${message.author.username}`
+    let messageUserPrefix = `${message.author.globalName} / ${message.author.displayName} / ${message.author.id}`
     let messageToSendAI = messageUserPrefix + ": " + messageContent
 
     let hasRef = message.reference != null
     if(hasRef){
         let referenceMessage = await message.fetchReference()
         let refContent = referenceMessage.content
-        let refUsername = referenceMessage.author.username
-        let usernameInput = `@${refUsername} / @${referenceMessage.author.globalName} (${referenceMessage.author.id})`
+        let usernameInput = `${referenceMessage.author.globalName} / ${referenceMessage.author.displayName} /  (${referenceMessage.author.id})`
 
         messageToSendAI = `Message being replied to: \`\`\`${usernameInput}: ${refContent}\`\`\`\n` + messageToSendAI
 
